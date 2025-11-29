@@ -41,17 +41,17 @@ FundVerse/
 │   │   ├── Input.jsx              # Form input with icon/error support
 │   │   ├── Layout.jsx             # Layout wrapper (unused in current implementation)
 │   │   ├── Navbar.jsx             # Global navigation bar
-│   │   ├── ProgressBar.jsx         # Animated progress bar
+│   │   ├── ProgressBar.jsx        # Animated progress bar
 │   │   ├── ProjectCard.jsx        # Campaign/project card component
-│   │   ├── ProjectGrid.jsx         # Grid layout for projects
+│   │   ├── ProjectGrid.jsx        # Grid layout for projects
 │   │   └── RoleToggle.jsx         # Student/Company role selector
 │   ├── pages/                     # Page components
 │   │   ├── AuthPage.jsx           # Login/Signup page
 │   │   ├── CampaignDetails.jsx    # Individual campaign detail page
-│   │   ├── CompanyDashboard.jsx  # Company/admin dashboard
+│   │   ├── CompanyDashboard.jsx   # Company/admin dashboard
 │   │   ├── CreateCampaign.jsx     # Campaign creation landing page
 │   │   ├── CreateCampaignForm.jsx # Full campaign creation form
-│   │   ├── Discover.jsx          # Campaign discovery/browse page
+│   │   ├── Discover.jsx           # Campaign discovery/browse page
 │   │   ├── Home.jsx               # Landing/home page
 │   │   ├── PaymentPage.jsx        # Payment processing page
 │   │   ├── StudentDashboard.jsx   # Student dashboard
