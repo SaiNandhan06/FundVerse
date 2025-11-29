@@ -33,14 +33,10 @@ function SupportAmount() {
   const handleContinue = () => {
     const amount = selectedAmount || parseFloat(customAmount);
     if (amount && amount > 0) {
-      navigate('/support/payment', {
-        state: {
-          amount: amount,
-          projectName: projectName,
-          creatorName: creatorName,
-          isAnonymous: isAnonymous,
-        },
-      });
+      // Show coming soon message instead of redirecting to payment
+      alert(`Thank you for your support of ₹${amount.toLocaleString('en-IN')}!\n\nPayment processing is coming soon. Your contribution will help bring this project to life.`);
+      // Navigate back to discover
+      navigate('/discover');
     }
   };
 
@@ -147,7 +143,7 @@ function SupportAmount() {
                     : 'bg-fundverseGrayLight text-mutedText cursor-not-allowed'
                 }`}
               >
-                Continue to Payment
+                Support Project
               </button>
             </div>
 

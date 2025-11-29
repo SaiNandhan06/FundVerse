@@ -1,61 +1,219 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { STORAGE_KEYS } from '../services/storage/storageKeys';
+import { storageService } from '../services/storage/localStorage.service';
+import { campaignsService } from '../services/data/campaigns.service';
 
 function StudentDashboard() {
-  const [activeSection, setActiveSection] = useState('overview');
+  const location = useLocation();
+  const [activeSection, setActiveSection] = useState(() => {
+    // If on /student/projects route, set active section to projects
+    return location.pathname === '/student/projects' ? 'projects' : 'overview';
+  });
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     const saved = localStorage.getItem('studentSidebarOpen');
     if (saved !== null) return JSON.parse(saved);
     return window.innerWidth >= 768;
   });
+  const [currentUser, setCurrentUser] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     localStorage.setItem('studentSidebarOpen', JSON.stringify(sidebarOpen));
   }, [sidebarOpen]);
 
-  const handleMyProjects = () => {
-    navigate('/student/projects');
-  };
-
-  // Student Profile Data
-  const studentProfile = {
-    name: 'Sai Nandhan',
-    college: 'KL University',
-    major: 'Computer Science',
-    ongoingProjects: 2,
-    totalRaised: '₹85,000',
-    profilePicture: 'data:image/svg+xml,%3Csvg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"%3E%3Ccircle cx="50" cy="50" r="50" fill="%232563EB"/%3E%3Ccircle cx="50" cy="35" r="12" fill="%23DBEAFE"/%3E%3Cpath d="M25 70C25 60 30 55 40 55L60 55C70 55 75 60 75 70L75 85L25 85L25 70Z" fill="%23DBEAFE"/%3E%3C/svg%3E'
-  };
-
-  // My Projects Data
-  const myProjects = [
-    {
-      title: 'Smart Irrigation using IoT',
-      category: 'AgriTech',
-      goal: '₹50,000',
-      raised: '₹42,500',
-      fundedPercent: '85%',
-      status: 'Active',
-      created: '10/10/2025'
-    },
-    {
-      title: 'Affordable Electric Cycle for Students',
-      category: 'Mobility',
-      goal: '₹35,000',
-      raised: '₹25,000',
-      fundedPercent: '71%',
-      status: 'Pending',
-      created: '24/09/2025'
+  useEffect(() => {
+    // Check if user is authenticated
+    const userStr = sessionStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+    if (!userStr) {
+      navigate('/login');
+      return;
     }
-  ];
 
-  // Funding Analytics
-  const analytics = {
-    totalCampaigns: 3,
-    successRate: '78%',
-    totalBackers: 124
+    try {
+      const user = JSON.parse(userStr);
+      // Verify user role
+      if (user.role !== 'student') {
+        navigate('/login');
+        return;
+      }
+      setCurrentUser(user);
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+      navigate('/login');
+    }
+  }, [navigate]);
+
+  // Update active section when route changes
+  useEffect(() => {
+    if (location.pathname === '/student/projects') {
+      setActiveSection('projects');
+    } else if (location.pathname === '/student/dashboard') {
+      setActiveSection('overview');
+    }
+  }, [location.pathname]);
+
+  // Removed handleMyProjects - projects section now stays within dashboard
+
+  const handleLogout = () => {
+    sessionStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    storageService.remove(STORAGE_KEYS.USER_ROLE);
+    navigate('/login');
   };
+
+  // Get user's full data from localStorage
+  const getUserData = () => {
+    if (!currentUser) return null;
+    const users = storageService.get(STORAGE_KEYS.USERS, []);
+    const fullUserData = users.find(u => u.id === currentUser.id);
+    return fullUserData || currentUser;
+  };
+
+  const userData = getUserData();
+
+  // Load user's projects from localStorage
+  const [myProjects, setMyProjects] = useState([]);
+
+  // Student Profile Data - use actual user data (reactive to myProjects)
+  const studentProfile = useMemo(() => {
+    const realProjects = myProjects.filter(p => !p.id?.startsWith('dummy-'));
+    const totalRaisedAmount = realProjects.reduce((sum, p) => {
+      const raised = parseFloat(p.raised.replace(/[₹,]/g, '')) || 0;
+      return sum + raised;
+    }, 0);
+
+    return {
+      name: userData?.name || currentUser?.name || 'Student',
+      email: userData?.email || currentUser?.email || '',
+      college: userData?.college || 'Not specified',
+      major: userData?.major || 'Not specified',
+      ongoingProjects: realProjects.filter(p => p.status === 'Active').length,
+      totalRaised: `₹${totalRaisedAmount.toLocaleString('en-IN')}`,
+      profilePicture: 'data:image/svg+xml,%3Csvg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"%3E%3Ccircle cx="50" cy="50" r="50" fill="%232563EB"/%3E%3Ccircle cx="50" cy="35" r="12" fill="%23DBEAFE"/%3E%3Cpath d="M25 70C25 60 30 55 40 55L60 55C70 55 75 60 75 70L75 85L25 85L25 70Z" fill="%23DBEAFE"/%3E%3C/svg%3E'
+    };
+  }, [userData, currentUser, myProjects]);
+
+  const loadUserProjects = useCallback(async () => {
+    try {
+      // Get user's email from currentUser or from localStorage users
+      const userEmail = currentUser?.email;
+      const userId = currentUser?.id;
+      
+      if (!userEmail && !userId) {
+        // Fallback to dummy project
+        setMyProjects([
+          {
+            title: 'Smart Irrigation using IoT',
+            category: 'AgriTech',
+            goal: '₹50,000',
+            raised: '₹42,500',
+            fundedPercent: '85%',
+            status: 'Active',
+            created: '10/10/2025',
+            id: 'dummy-1'
+          }
+        ]);
+        return;
+      }
+
+      // Try getUserCampaigns first, then fallback to filtering all campaigns
+      let userProjects = [];
+      try {
+        userProjects = await campaignsService.getUserCampaigns(userEmail || userId);
+      } catch (error) {
+        // Fallback: Get all campaigns and filter
+        const allCampaigns = await campaignsService.getAll();
+        userProjects = allCampaigns.filter(campaign => 
+          campaign.creator?.email === userEmail || 
+          campaign.creator?.id === userId ||
+          campaign.email === userEmail
+        );
+      }
+
+      const formattedProjects = userProjects.map(campaign => {
+        const raised = campaign.raised || 0;
+        const target = campaign.targetAmount || 0;
+        const fundedPercent = target > 0 ? Math.round((raised / target) * 100) : 0;
+        
+        return {
+          title: campaign.campaignTitle || campaign.title || 'Untitled Campaign',
+          category: campaign.category || 'Others',
+          goal: `₹${target.toLocaleString('en-IN')}`,
+          raised: `₹${raised.toLocaleString('en-IN')}`,
+          fundedPercent: `${fundedPercent}%`,
+          backers: (campaign.backers || 0).toString(),
+          status: campaign.status || 'Active',
+          created: campaign.created ? new Date(campaign.created).toLocaleDateString('en-IN') : 'N/A',
+          id: campaign.id
+        };
+      });
+
+      // Add 1 dummy project if user has no projects
+      if (formattedProjects.length === 0) {
+        setMyProjects([
+          {
+            title: 'Smart Irrigation using IoT',
+            category: 'AgriTech',
+            goal: '₹50,000',
+            raised: '₹42,500',
+            fundedPercent: '85%',
+            status: 'Active',
+            created: '10/10/2025',
+            id: 'dummy-1'
+          }
+        ]);
+      } else {
+        setMyProjects(formattedProjects);
+      }
+    } catch (error) {
+      console.error('Error loading user projects:', error);
+      // Fallback to 1 dummy project
+      setMyProjects([
+        {
+          title: 'Smart Irrigation using IoT',
+          category: 'AgriTech',
+          goal: '₹50,000',
+          raised: '₹42,500',
+          fundedPercent: '85%',
+          status: 'Active',
+          created: '10/10/2025',
+          id: 'dummy-1'
+        }
+      ]);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (currentUser) {
+      loadUserProjects();
+    }
+  }, [currentUser, loadUserProjects]);
+
+  // Reload projects when navigating to projects section
+  useEffect(() => {
+    if (currentUser && activeSection === 'projects') {
+      loadUserProjects();
+    }
+  }, [activeSection, currentUser, loadUserProjects]);
+
+  // Funding Analytics - calculate from actual projects
+  const analytics = useMemo(() => {
+    const realProjects = myProjects.filter(p => !p.id?.startsWith('dummy-'));
+    const completedProjects = realProjects.filter(p => 
+      p.status === 'Completed' || parseFloat(p.fundedPercent.replace('%', '')) >= 100
+    ).length;
+    const totalBackers = realProjects.reduce((sum, p) => {
+      return sum + (parseInt(p.backers) || 0);
+    }, 0);
+
+    return {
+      totalCampaigns: realProjects.length,
+      successRate: realProjects.length > 0 
+        ? `${Math.round((completedProjects / realProjects.length) * 100)}%`
+        : '0%',
+      totalBackers: totalBackers
+    };
+  }, [myProjects]);
 
   // Recent Supporters
   const recentSupporters = [
@@ -66,7 +224,7 @@ function StudentDashboard() {
 
   const menuItems = [
     { id: 'overview', label: 'Overview', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
-    { id: 'projects', label: 'My Projects', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10', action: handleMyProjects },
+    { id: 'projects', label: 'My Projects', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' },
     { id: 'analytics', label: 'Analytics', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
     { id: 'community', label: 'Community', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z' },
     { id: 'profile', label: 'Profile', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
@@ -85,6 +243,11 @@ function StudentDashboard() {
         return 'bg-[#6B7280] text-white';
     }
   };
+
+  // Don't render if user is not authenticated
+  if (!currentUser) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] flex">
@@ -124,13 +287,7 @@ function StudentDashboard() {
             {menuItems.map((item) => (
               <button
                 key={item.id}
-                onClick={() => {
-                  if (item.action) {
-                    item.action();
-                  } else {
-                    setActiveSection(item.id);
-                  }
-                }}
+                onClick={() => setActiveSection(item.id)}
                 className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-300 ease-in-out flex items-center gap-3 ${
                   activeSection === item.id
                     ? 'bg-[#3B82F6] text-white'
@@ -152,9 +309,20 @@ function StudentDashboard() {
       <main className={`flex-1 transition-all duration-300 ease-in-out ${sidebarOpen ? 'ml-64' : 'ml-20'}`}>
         <div className="p-8">
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-[#111827]">Student Dashboard</h1>
-            <p className="text-[#6B7280] mt-2">Welcome back, {studentProfile.name}!</p>
+          <div className="mb-8 flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-[#111827]">Student Dashboard</h1>
+              <p className="text-[#6B7280] mt-2">Welcome back, {studentProfile.name}!</p>
+              {studentProfile.email && (
+                <p className="text-sm text-[#6B7280] mt-1">{studentProfile.email}</p>
+              )}
+            </div>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
+            >
+              Logout
+            </button>
           </div>
 
           {/* Overview Section */}
@@ -171,18 +339,30 @@ function StudentDashboard() {
                   <div className="flex-1">
                     <h2 className="text-2xl font-bold text-[#111827] mb-2">{studentProfile.name}</h2>
                     <div className="space-y-1 text-[#6B7280]">
-                      <p className="flex items-center gap-2">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                        </svg>
-                        {studentProfile.college}
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                        </svg>
-                        {studentProfile.major}
-                      </p>
+                      {studentProfile.college !== 'Not specified' && (
+                        <p className="flex items-center gap-2">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                          </svg>
+                          {studentProfile.college}
+                        </p>
+                      )}
+                      {studentProfile.major !== 'Not specified' && (
+                        <p className="flex items-center gap-2">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                          </svg>
+                          {studentProfile.major}
+                        </p>
+                      )}
+                      {studentProfile.email && (
+                        <p className="flex items-center gap-2">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                          {studentProfile.email}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
@@ -201,57 +381,96 @@ function StudentDashboard() {
               {/* My Projects Section */}
               <div className="mb-8">
                 <h2 className="text-2xl font-bold text-[#111827] mb-6">My Projects</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {myProjects.map((project, index) => (
-                    <div
-                      key={index}
-                      className="bg-[#FFFFFF] rounded-lg shadow-md p-6 border border-[#E5E7EB] hover:shadow-lg transition-all duration-300 ease-in-out hover:scale-[1.02]"
-                    >
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <h3 className="text-xl font-bold text-[#111827] mb-2">{project.title}</h3>
-                          <span className="inline-block px-3 py-1 bg-[#EEF2FF] text-[#3B82F6] rounded-full text-sm font-medium">
-                            {project.category}
+                {myProjects.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {myProjects.map((project, index) => (
+                      <div
+                        key={project.id || index}
+                        className="bg-[#FFFFFF] rounded-lg shadow-md p-6 border border-[#E5E7EB] hover:shadow-lg transition-all duration-300 ease-in-out hover:scale-[1.02]"
+                      >
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex-1">
+                            <h3 className="text-xl font-bold text-[#111827] mb-2">{project.title}</h3>
+                            <span className="inline-block px-3 py-1 bg-[#EEF2FF] text-[#3B82F6] rounded-full text-sm font-medium">
+                              {project.category}
+                            </span>
+                          </div>
+                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(project.status)}`}>
+                            {project.status}
                           </span>
                         </div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(project.status)}`}>
-                          {project.status}
-                        </span>
-                      </div>
-                      
-                      <div className="mb-4">
-                        <div className="flex items-center justify-between text-sm mb-2">
-                          <span className="text-[#6B7280]">Progress</span>
-                          <span className="font-semibold text-[#111827]">{project.fundedPercent}</span>
+                        
+                        <div className="mb-4">
+                          <div className="flex items-center justify-between text-sm mb-2">
+                            <span className="text-[#6B7280]">Progress</span>
+                            <span className="font-semibold text-[#111827]">{project.fundedPercent}</span>
+                          </div>
+                          <div className="w-full bg-[#E5E7EB] rounded-full h-2">
+                            <div
+                              className="bg-[#3B82F6] h-2 rounded-full transition-all duration-300"
+                              style={{ width: project.fundedPercent }}
+                            ></div>
+                          </div>
                         </div>
-                        <div className="w-full bg-[#E5E7EB] rounded-full h-2">
-                          <div
-                            className="bg-[#3B82F6] h-2 rounded-full transition-all duration-300"
-                            style={{ width: project.fundedPercent }}
-                          ></div>
-                        </div>
-                      </div>
 
-                      <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div>
-                          <p className="text-sm text-[#6B7280]">Goal</p>
-                          <p className="text-lg font-bold text-[#111827]">{project.goal}</p>
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <p className="text-sm text-[#6B7280]">Goal</p>
+                            <p className="text-lg font-bold text-[#111827]">{project.goal}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-[#6B7280]">Raised</p>
+                            <p className="text-lg font-bold text-[#111827]">{project.raised}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm text-[#6B7280]">Raised</p>
-                          <p className="text-lg font-bold text-[#111827]">{project.raised}</p>
-                        </div>
-                      </div>
 
-                      <div className="flex items-center justify-between pt-4 border-t border-[#E5E7EB]">
-                        <span className="text-sm text-[#6B7280]">Created: {project.created}</span>
-                        <button className="px-4 py-2 bg-[#3B82F6] text-white rounded-lg hover:bg-[#2563EB] transition-colors text-sm font-medium">
-                          View Details
-                        </button>
+                        <div className="flex items-center justify-between pt-4 border-t border-[#E5E7EB]">
+                          <span className="text-sm text-[#6B7280]">Created: {project.created}</span>
+                          <div className="flex gap-2">
+                            <Link
+                              to={`/campaign/${project.id}`}
+                              className="px-4 py-2 bg-[#3B82F6] text-white rounded-lg hover:bg-[#2563EB] transition-colors text-sm font-medium"
+                            >
+                              View Details
+                            </Link>
+                            {project.id && !project.id.startsWith('dummy-') && (
+                              <button
+                                onClick={async () => {
+                                  if (window.confirm(`Are you sure you want to delete "${project.title}"? This action cannot be undone.`)) {
+                                    try {
+                                      await campaignsService.delete(project.id);
+                                      loadUserProjects(); // Reload the list
+                                    } catch (error) {
+                                      console.error('Error deleting campaign:', error);
+                                      alert('Failed to delete campaign. Please try again.');
+                                    }
+                                  }
+                                }}
+                                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-[#FFFFFF] rounded-lg shadow-md p-12 text-center border border-[#E5E7EB]">
+                    <svg className="w-16 h-16 text-[#6B7280] mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    <p className="text-xl font-semibold text-[#111827] mb-2">No Projects Yet</p>
+                    <p className="text-[#6B7280] mb-6">Start your first campaign to get funding for your innovative ideas!</p>
+                    <Link
+                      to="/create/form"
+                      className="inline-block px-6 py-3 bg-[#3B82F6] text-white rounded-lg hover:bg-[#2563EB] transition-colors font-medium"
+                    >
+                      Create Your First Project
+                    </Link>
+                  </div>
+                )}
               </div>
 
               {/* Funding Analytics Section */}
@@ -298,6 +517,120 @@ function StudentDashboard() {
                 </div>
               </div>
             </>
+          )}
+
+          {/* My Projects Section */}
+          {activeSection === 'projects' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-[#111827]">My Projects</h2>
+                <button
+                  onClick={() => {
+                    setActiveSection('overview');
+                    if (location.pathname === '/student/projects') {
+                      navigate('/student/dashboard');
+                    }
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 text-[#6B7280] hover:text-[#111827] transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  </svg>
+                  <span>Back to Overview</span>
+                </button>
+              </div>
+
+              {myProjects.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {myProjects.map((project, index) => (
+                    <div
+                      key={index}
+                      className="bg-[#FFFFFF] rounded-lg shadow-md p-6 border border-[#E5E7EB] hover:shadow-lg transition-all duration-300 ease-in-out hover:scale-[1.02]"
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <h3 className="text-xl font-bold text-[#111827] mb-2">{project.title}</h3>
+                          <span className="inline-block px-3 py-1 bg-[#EEF2FF] text-[#3B82F6] rounded-full text-sm font-medium">
+                            {project.category}
+                          </span>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(project.status)}`}>
+                          {project.status}
+                        </span>
+                      </div>
+                      
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between text-sm mb-2">
+                          <span className="text-[#6B7280]">Progress</span>
+                          <span className="font-semibold text-[#111827]">{project.fundedPercent}</span>
+                        </div>
+                        <div className="w-full bg-[#E5E7EB] rounded-full h-2">
+                          <div
+                            className="bg-[#3B82F6] h-2 rounded-full transition-all duration-300"
+                            style={{ width: project.fundedPercent }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <p className="text-sm text-[#6B7280]">Goal</p>
+                          <p className="text-lg font-bold text-[#111827]">{project.goal}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-[#6B7280]">Raised</p>
+                          <p className="text-lg font-bold text-[#111827]">{project.raised}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-4 border-t border-[#E5E7EB]">
+                        <span className="text-sm text-[#6B7280]">Created: {project.created}</span>
+                        <div className="flex gap-2">
+                          <Link
+                            to={`/campaign/${project.id}`}
+                            className="px-4 py-2 bg-[#3B82F6] text-white rounded-lg hover:bg-[#2563EB] transition-colors text-sm font-medium"
+                          >
+                            View Details
+                          </Link>
+                          {project.id && !project.id.startsWith('dummy-') && (
+                            <button
+                              onClick={async () => {
+                                if (window.confirm(`Are you sure you want to delete "${project.title}"? This action cannot be undone.`)) {
+                                  try {
+                                    await campaignsService.delete(project.id);
+                                    loadUserProjects(); // Reload the list
+                                  } catch (error) {
+                                    console.error('Error deleting campaign:', error);
+                                    alert('Failed to delete campaign. Please try again.');
+                                  }
+                                }
+                              }}
+                              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-[#FFFFFF] rounded-lg shadow-md p-12 text-center border border-[#E5E7EB]">
+                  <svg className="w-16 h-16 text-[#6B7280] mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                  <p className="text-xl font-semibold text-[#111827] mb-2">No Projects Yet</p>
+                  <p className="text-[#6B7280] mb-6">Start your first campaign to get funding for your innovative ideas!</p>
+                  <Link
+                    to="/create/form"
+                    className="inline-block px-6 py-3 bg-[#3B82F6] text-white rounded-lg hover:bg-[#2563EB] transition-colors font-medium"
+                  >
+                    Create Your First Project
+                  </Link>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Other Sections Placeholder */}

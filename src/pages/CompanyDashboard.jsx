@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { STORAGE_KEYS } from '../services/storage/storageKeys';
+import { storageService } from '../services/storage/localStorage.service';
 
 function CompanyDashboard() {
   const [activeSection, setActiveSection] = useState('overview');
@@ -9,23 +11,63 @@ function CompanyDashboard() {
     if (saved !== null) return JSON.parse(saved);
     return window.innerWidth >= 768;
   });
+  const [currentUser, setCurrentUser] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     localStorage.setItem('companySidebarOpen', JSON.stringify(sidebarOpen));
   }, [sidebarOpen]);
 
+  useEffect(() => {
+    // Check if user is authenticated
+    const userStr = sessionStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+    if (!userStr) {
+      navigate('/login');
+      return;
+    }
+
+    try {
+      const user = JSON.parse(userStr);
+      // Verify user role
+      if (user.role !== 'company') {
+        navigate('/login');
+        return;
+      }
+      setCurrentUser(user);
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+      navigate('/login');
+    }
+  }, [navigate]);
+
   const handleSwitchRole = () => {
     navigate('/student/dashboard');
   };
 
-  // Company Summary Data
+  const handleLogout = () => {
+    sessionStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    storageService.remove(STORAGE_KEYS.USER_ROLE);
+    navigate('/login');
+  };
+
+  // Get user's full data from localStorage
+  const getUserData = () => {
+    if (!currentUser) return null;
+    const users = storageService.get(STORAGE_KEYS.USERS, []);
+    const fullUserData = users.find(u => u.id === currentUser.id);
+    return fullUserData || currentUser;
+  };
+
+  const userData = getUserData();
+
+  // Company Summary Data - use actual user data
   const companySummary = {
-    name: 'Bharat Innovations',
+    name: userData?.name || currentUser?.name || 'Company',
+    email: userData?.email || currentUser?.email || '',
     role: 'Admin',
-    totalStartups: 12,
-    totalFunds: '₹4.2Cr',
-    activeCampaigns: 8
+    totalStartups: 0, // Will be calculated from actual campaigns
+    totalFunds: '₹0', // Will be calculated from actual campaigns
+    activeCampaigns: 0 // Will be calculated from actual campaigns
   };
 
   // Recent Campaigns Data
@@ -60,6 +102,11 @@ function CompanyDashboard() {
     };
     return colors[status] || 'bg-[#6B7280] text-white';
   };
+
+  // Don't render if user is not authenticated
+  if (!currentUser) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] flex">
@@ -140,10 +187,10 @@ function CompanyDashboard() {
                   Explore
                 </Link>
                 <button
-                  onClick={handleSwitchRole}
-                  className="px-4 py-2 bg-[#F9FAFB] text-[#111827] rounded-lg hover:bg-[#EEF2FF] transition-colors font-medium border border-[#E5E7EB]"
+                  onClick={handleLogout}
+                  className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium"
                 >
-                  Switch Role
+                  Logout
                 </button>
               </div>
             </div>
@@ -158,6 +205,9 @@ function CompanyDashboard() {
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
                   <div>
                     <h1 className="text-3xl font-bold mb-2">{companySummary.name}</h1>
+                    {companySummary.email && (
+                      <p className="text-blue-100 text-sm mb-2">{companySummary.email}</p>
+                    )}
                     <p className="text-blue-100 text-lg mb-4">Role: {companySummary.role}</p>
                     <div className="grid grid-cols-3 gap-6">
                       <div>

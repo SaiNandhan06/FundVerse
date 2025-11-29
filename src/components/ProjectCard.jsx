@@ -1,5 +1,8 @@
 import { Link } from 'react-router-dom';
+import { useState } from 'react';
 import ProgressBar from './ProgressBar';
+import { campaignsService } from '../services/data/campaigns.service';
+import { STORAGE_KEYS } from '../services/storage/storageKeys';
 
 function ProjectCard({
   image,
@@ -12,8 +15,35 @@ function ProjectCard({
   fundedPercent,
   backers,
   daysLeft,
-  projectId
+  projectId,
+  onDelete,
+  isOwner = false
 }) {
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!window.confirm(`Are you sure you want to delete "${title}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await campaignsService.delete(projectId);
+      if (onDelete) {
+        onDelete(projectId);
+      } else {
+        // Reload the page to refresh the list
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Error deleting campaign:', error);
+      alert('Failed to delete campaign. Please try again.');
+      setIsDeleting(false);
+    }
+  };
   return (
     <div className="bg-[#FFFFFF] rounded-lg shadow-sm border border-[#E5E7EB] overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
       {/* Image */}
@@ -79,12 +109,23 @@ function ProjectCard({
           >
             View Details
           </Link>
-          <Link
-            to="/support"
-            className="flex-1 px-4 py-2 bg-[#3B82F6] text-white rounded-lg font-medium hover:bg-[#2563EB] transition-colors text-center"
-          >
-            Support
-          </Link>
+          {isOwner && !projectId?.startsWith('dummy-') ? (
+            <button
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </button>
+          ) : (
+            <Link
+              to="/support"
+              state={{ projectName: title, creatorName: creator }}
+              className="flex-1 px-4 py-2 bg-[#3B82F6] text-white rounded-lg font-medium hover:bg-[#2563EB] transition-colors text-center"
+            >
+              Support
+            </Link>
+          )}
         </div>
       </div>
     </div>

@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { campaignsService } from '../services/data/campaigns.service';
+import { STORAGE_KEYS } from '../services/storage/storageKeys';
 
 function CreateCampaignForm() {
   const navigate = useNavigate();
@@ -151,13 +153,60 @@ function CreateCampaignForm() {
   };
 
   // Handle submit
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (validateForm()) {
-      setShowSuccess(true);
-      setTimeout(() => {
-        navigate('/discover');
-      }, 2000);
+      try {
+        // Get current user from sessionStorage
+        const userStr = sessionStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+        let currentUser = null;
+        if (userStr) {
+          currentUser = JSON.parse(userStr);
+        }
+
+        // Prepare campaign data - use format that Campaign model expects
+        const campaignData = {
+          campaignTitle: formData.campaignTitle,
+          campaignTagline: formData.campaignTagline,
+          category: formData.category,
+          creatorType: formData.creatorType,
+          description: formData.description,
+          targetAmount: parseFloat(formData.targetAmount),
+          minimumContribution: parseFloat(formData.minimumContribution),
+          deadline: formData.deadline,
+          raised: 0,
+          backers: 0,
+          status: 'Active',
+          creatorName: formData.creatorName,
+          email: formData.email,
+          organization: formData.organization || '',
+          city: formData.city,
+          state: formData.state,
+          creator: {
+            name: formData.creatorName,
+            email: formData.email,
+            organization: formData.organization || '',
+            city: formData.city,
+            state: formData.state,
+            id: currentUser?.id || null,
+          },
+          milestones: formData.milestones || [],
+          coverImage: formData.coverImage ? URL.createObjectURL(formData.coverImage) : null,
+          additionalImages: formData.additionalImages?.map(img => URL.createObjectURL(img)) || [],
+          pitchDeck: formData.pitchDeck ? URL.createObjectURL(formData.pitchDeck) : null,
+        };
+
+        // Save campaign using service
+        await campaignsService.create(campaignData);
+        
+        setShowSuccess(true);
+        setTimeout(() => {
+          navigate('/discover');
+        }, 2000);
+      } catch (error) {
+        console.error('Error creating campaign:', error);
+        alert('Failed to create campaign. Please try again.');
+      }
     } else {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }

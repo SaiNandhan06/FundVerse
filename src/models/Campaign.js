@@ -114,8 +114,12 @@ export class Campaign {
       created: this.created,
       updated: this.updated,
       creator: this.creator,
+      creatorName: this.creator.name, // Also save for easy access
+      email: this.creator.email, // Also save for easy access
       milestones: this.milestones,
       images: this.images,
+      coverImage: this.images?.cover || null, // Also save coverImage directly for compatibility
+      additionalImages: this.images?.additional || [],
       pitchDeck: this.pitchDeck,
       idProof: this.idProof,
     };

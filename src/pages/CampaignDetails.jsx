@@ -1,43 +1,172 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import ProgressBar from '../components/ProgressBar';
 import Accordion from '../components/Accordion';
 import Button from '../components/Button';
+import { campaignsService } from '../services/data/campaigns.service';
 
 function CampaignDetails() {
   const { id } = useParams();
   const [activeTab, setActiveTab] = useState('story');
   const [liked, setLiked] = useState(false);
+  const [campaign, setCampaign] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data - Indian context
-  const campaign = {
-    title: "AI-Powered Soil Health Scanner for Farmers",
-    description: "Revolutionary IoT device that analyzes soil health in real-time, helping Indian farmers optimize crop yields and reduce fertilizer costs.",
-    creator: {
-      name: "Dr. Riya Iyer",
-      avatar: "RI",
-      verified: true,
-      location: "Chennai, Tamil Nadu"
+  // Dummy campaign data for different projects
+  const dummyCampaigns = {
+    'dummy-1': {
+      title: "AI-Powered Soil Health Scanner for Farmers",
+      description: "Revolutionary IoT device that analyzes soil health in real-time, helping Indian farmers optimize crop yields and reduce fertilizer costs.",
+      creator: {
+        name: "Dr. Riya Iyer",
+        avatar: "RI",
+        verified: true,
+        location: "Chennai, Tamil Nadu"
+      },
+      stats: {
+        raised: 850000,
+        goal: 1200000,
+        backers: 342,
+        daysLeft: 18
+      },
+      supportTiers: [
+        { amount: 500, title: "Early Supporter", benefits: ["Thank you message", "Project updates"] },
+        { amount: 1000, title: "Backer", benefits: ["All previous", "Early access", "Digital rewards"] },
+        { amount: 2500, title: "VIP Backer", benefits: ["All previous", "Exclusive content", "Beta access"] },
+        { amount: 5000, title: "Premium Supporter", benefits: ["All previous", "1-on-1 consultation", "Lifetime access"] }
+      ],
+      recentBackers: [
+        { name: "Arjun P.", amount: 5000, time: "2 hours ago" },
+        { name: "Kavya R.", amount: 1000, time: "5 hours ago" },
+        { name: "Vikram S.", amount: 10000, time: "1 day ago" },
+        { name: "Priya M.", amount: 2500, time: "2 days ago" }
+      ],
+      story: "Our journey began when we recognized a critical gap in agricultural technology for Indian farmers. Despite advances in farming techniques, millions of farmers across India struggle to optimize crop yields and manage soil health effectively. This IoT device leverages artificial intelligence to analyze soil health in real-time, helping farmers make data-driven decisions about irrigation, fertilization, and crop selection. We're building a future where technology empowers every farmer in India.",
+      team: ['Dr. Riya Iyer', 'Arjun Patel', 'Kavya Reddy', 'Vikram Singh']
     },
-    stats: {
-      raised: 850000,
-      goal: 1200000,
-      backers: 342,
-      daysLeft: 18
+    'dummy-2': {
+      title: "Community Solar Light Project for Rural Areas",
+      description: "Affordable solar energy solutions for rural communities, bringing clean power to underserved villages across India.",
+      creator: {
+        name: "Arjun Patel",
+        avatar: "AP",
+        verified: true,
+        location: "Mumbai, Maharashtra"
+      },
+      stats: {
+        raised: 625000,
+        goal: 1000000,
+        backers: 218,
+        daysLeft: 25
+      },
+      supportTiers: [
+        { amount: 300, title: "Supporter", benefits: ["Thank you message", "Project updates"] },
+        { amount: 750, title: "Community Member", benefits: ["All previous", "Solar light for one family", "Project recognition"] },
+        { amount: 1500, title: "Village Sponsor", benefits: ["All previous", "Solar lights for 5 families", "Naming rights"] },
+        { amount: 3000, title: "Community Leader", benefits: ["All previous", "Solar installation in your name", "Lifetime updates"] }
+      ],
+      recentBackers: [
+        { name: "Rahul K.", amount: 3000, time: "1 hour ago" },
+        { name: "Sneha M.", amount: 750, time: "3 hours ago" },
+        { name: "Amit S.", amount: 1500, time: "1 day ago" },
+        { name: "Neha P.", amount: 300, time: "2 days ago" }
+      ],
+      story: "Access to reliable electricity is a fundamental right, yet millions in rural India live without it. Our solar light project aims to bring clean, affordable energy to underserved communities. We work directly with village councils to install solar-powered lighting systems that improve quality of life, enable children to study after dark, and support small businesses. Together, we can light up India, one village at a time.",
+      team: ['Arjun Patel', 'Meera Desai', 'Rajesh Kumar', 'Sunita Nair']
     },
-    supportTiers: [
-      { amount: 500, title: "Early Supporter", benefits: ["Thank you message", "Project updates"] },
-      { amount: 1000, title: "Backer", benefits: ["All previous", "Early access", "Digital rewards"] },
-      { amount: 2500, title: "VIP Backer", benefits: ["All previous", "Exclusive content", "Beta access"] },
-      { amount: 5000, title: "Premium Supporter", benefits: ["All previous", "1-on-1 consultation", "Lifetime access"] }
-    ],
-    recentBackers: [
-      { name: "Arjun P.", amount: 5000, time: "2 hours ago" },
-      { name: "Kavya R.", amount: 1000, time: "5 hours ago" },
-      { name: "Vikram S.", amount: 10000, time: "1 day ago" },
-      { name: "Priya M.", amount: 2500, time: "2 days ago" }
-    ]
+    'dummy-3': {
+      title: "Digital Literacy Program for Rural Youth",
+      description: "Comprehensive online learning platform offering courses in technology, business, and digital skills for rural students.",
+      creator: {
+        name: "Kavya Reddy",
+        avatar: "KR",
+        verified: true,
+        location: "Hyderabad, Telangana"
+      },
+      stats: {
+        raised: 450000,
+        goal: 750000,
+        backers: 156,
+        daysLeft: 12
+      },
+      supportTiers: [
+        { amount: 400, title: "Student Supporter", benefits: ["Thank you message", "Course updates"] },
+        { amount: 1000, title: "Education Sponsor", benefits: ["All previous", "Sponsor one student's course", "Recognition"] },
+        { amount: 2500, title: "School Partner", benefits: ["All previous", "Sponsor 5 students", "School recognition"] },
+        { amount: 5000, title: "Community Educator", benefits: ["All previous", "Sponsor entire class", "Naming rights"] }
+      ],
+      recentBackers: [
+        { name: "Anjali T.", amount: 2500, time: "4 hours ago" },
+        { name: "Rohit D.", amount: 1000, time: "6 hours ago" },
+        { name: "Pooja S.", amount: 5000, time: "1 day ago" },
+        { name: "Kiran M.", amount: 400, time: "3 days ago" }
+      ],
+      story: "Education is the key to unlocking potential, but rural students often lack access to quality digital learning resources. Our platform provides comprehensive courses in technology, business skills, and digital literacy, designed specifically for rural youth. We partner with local schools and community centers to ensure every student has the opportunity to learn and grow. Join us in bridging the digital divide and empowering the next generation.",
+      team: ['Kavya Reddy', 'Suresh Iyer', 'Lakshmi Menon', 'Vikram Rao']
+    }
   };
+
+  useEffect(() => {
+    loadCampaign();
+  }, [id]);
+
+  const loadCampaign = async () => {
+    setLoading(true);
+    try {
+      // Check if it's a dummy campaign
+      if (id && dummyCampaigns[id]) {
+        setCampaign(dummyCampaigns[id]);
+      } else {
+        // Try to load from localStorage
+        const loadedCampaign = await campaignsService.getById(id);
+        if (loadedCampaign) {
+          setCampaign({
+            title: loadedCampaign.campaignTitle || loadedCampaign.title,
+            description: loadedCampaign.description || loadedCampaign.campaignTagline,
+            creator: {
+              name: loadedCampaign.creator?.name || loadedCampaign.creatorName || 'Anonymous',
+              avatar: (loadedCampaign.creator?.name || 'A').split(' ').map(n => n[0]).join('').substring(0, 2),
+              verified: false,
+              location: `${loadedCampaign.creator?.city || ''}, ${loadedCampaign.creator?.state || ''}`.trim()
+            },
+            stats: {
+              raised: loadedCampaign.raised || 0,
+              goal: loadedCampaign.targetAmount || 0,
+              backers: loadedCampaign.backers || 0,
+              daysLeft: loadedCampaign.getDaysLeft ? loadedCampaign.getDaysLeft() : 0
+            },
+            supportTiers: [
+              { amount: loadedCampaign.minimumContribution || 500, title: "Supporter", benefits: ["Thank you message", "Project updates"] },
+              { amount: (loadedCampaign.minimumContribution || 500) * 2, title: "Backer", benefits: ["All previous", "Early access"] },
+              { amount: (loadedCampaign.minimumContribution || 500) * 5, title: "VIP Backer", benefits: ["All previous", "Exclusive content"] }
+            ],
+            recentBackers: [],
+            story: loadedCampaign.description || '',
+            team: [loadedCampaign.creator?.name || 'Anonymous']
+          });
+        } else {
+          // Default to first dummy if not found
+          setCampaign(dummyCampaigns['dummy-1']);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading campaign:', error);
+      setCampaign(dummyCampaigns['dummy-1']);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading || !campaign) {
+    return (
+      <div className="min-h-screen bg-fundverseBg flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-fundverseBlue mx-auto mb-4"></div>
+          <p className="text-fundverseBody">Loading campaign...</p>
+        </div>
+      </div>
+    );
+  }
 
   const fundedPercent = Math.round((campaign.stats.raised / campaign.stats.goal) * 100);
 
@@ -99,7 +228,7 @@ function CampaignDetails() {
 
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-4">
-                <Link to="/support">
+                <Link to="/support" state={{ projectName: campaign.title, creatorName: campaign.creator.name }}>
                   <Button variant="primary" size="lg">
                     Support This Project
                   </Button>
@@ -163,15 +292,8 @@ function CampaignDetails() {
                 {activeTab === 'story' && (
                   <div>
                     <h3 className="text-2xl font-bold text-fundverseHeading mb-4">The Story</h3>
-                    <p className="text-fundverseBody mb-4">
-                      Our journey began when we recognized a critical gap in agricultural technology for Indian farmers. 
-                      Despite advances in farming techniques, millions of farmers across India struggle to 
-                      optimize crop yields and manage soil health effectively.
-                    </p>
-                    <p className="text-fundverseBody mb-4">
-                      This IoT device leverages artificial intelligence to analyze soil health in real-time, 
-                      helping farmers make data-driven decisions about irrigation, fertilization, and crop selection. 
-                      We're building a future where technology empowers every farmer in India.
+                    <p className="text-fundverseBody mb-4 whitespace-pre-line">
+                      {campaign.story || campaign.description}
                     </p>
                   </div>
                 )}
@@ -180,10 +302,10 @@ function CampaignDetails() {
                   <div>
                     <h3 className="text-2xl font-bold text-fundverseHeading mb-4">Our Team</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {['Dr. Riya Iyer', 'Arjun Patel', 'Kavya Reddy', 'Vikram Singh'].map((member) => (
+                      {(campaign.team || [campaign.creator.name]).map((member) => (
                         <div key={member} className="border border-fundverseBorder rounded-lg p-4">
                           <div className="w-16 h-16 bg-fundverse-gradient rounded-full flex items-center justify-center text-white font-bold text-xl mb-3">
-                            {member.split(' ').map(n => n[0]).join('')}
+                            {member.split(' ').map(n => n[0]).join('').substring(0, 2)}
                           </div>
                           <h4 className="font-semibold text-fundverseHeading">{member}</h4>
                           <p className="text-sm text-fundverseMuted">Team Member</p>
@@ -331,7 +453,7 @@ function CampaignDetails() {
                         </li>
                       ))}
                     </ul>
-                    <Link to="/support">
+                    <Link to="/support" state={{ projectName: campaign.title, creatorName: campaign.creator.name }}>
                       <Button variant="primary" size="sm" className="w-full mt-3">
                         Select Tier
                       </Button>

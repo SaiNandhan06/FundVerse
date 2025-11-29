@@ -1,23 +1,15 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { storageService } from '../services/storage/localStorage.service';
+import { STORAGE_KEYS } from '../services/storage/storageKeys';
 
 function AuthPage() {
   const [activeTab, setActiveTab] = useState('login');
   const [role, setRole] = useState('student');
   const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState('success'); // 'success' or 'error'
   const navigate = useNavigate();
-
-  // Dummy credentials for testing
-  const DUMMY_CREDENTIALS = {
-    student: {
-      email: 'student@fundverse.com',
-      password: 'student123'
-    },
-    company: {
-      email: 'company@fundverse.com',
-      password: 'company123'
-    }
-  };
 
   // Form states
   const [loginForm, setLoginForm] = useState({
@@ -35,9 +27,28 @@ function AuthPage() {
   const handleLoginSubmit = (e) => {
     e.preventDefault();
     
-    // Check dummy credentials
-    const credentials = DUMMY_CREDENTIALS[role];
-    if (loginForm.email === credentials.email && loginForm.password === credentials.password) {
+    // Get all registered users from localStorage
+    const users = storageService.get(STORAGE_KEYS.USERS, []);
+    
+    // Find user with matching email, password, and role
+    const user = users.find(
+      u => u.email === loginForm.email && 
+           u.password === loginForm.password && 
+           u.role === role
+    );
+    
+    if (user) {
+      // Store current user in sessionStorage for session management
+      sessionStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }));
+      
+      // Store user role
+      storageService.set(STORAGE_KEYS.USER_ROLE, user.role);
+      
       // Successful login - navigate to appropriate dashboard
       if (role === 'student') {
         navigate('/student/dashboard');
@@ -45,18 +56,95 @@ function AuthPage() {
         navigate('/company/dashboard');
       }
     } else {
-      // Show error (you can add a toast/alert here)
-      alert('Invalid credentials. Please use the dummy credentials shown below.');
+      // Show error toast
+      setToastMessage('Invalid credentials. Please check your email and password.');
+      setToastType('error');
+      setShowToast(true);
+      setTimeout(() => {
+        setShowToast(false);
+      }, 3000);
     }
   };
 
   const handleSignupSubmit = (e) => {
     e.preventDefault();
-    // Show toast notification
+    
+    // Validate password match
+    if (signupForm.password !== signupForm.confirmPassword) {
+      setToastMessage('Passwords do not match. Please try again.');
+      setToastType('error');
+      setShowToast(true);
+      setTimeout(() => {
+        setShowToast(false);
+      }, 3000);
+      return;
+    }
+    
+    // Validate password length
+    if (signupForm.password.length < 6) {
+      setToastMessage('Password must be at least 6 characters long.');
+      setToastType('error');
+      setShowToast(true);
+      setTimeout(() => {
+        setShowToast(false);
+      }, 3000);
+      return;
+    }
+    
+    // Get all registered users from localStorage
+    const users = storageService.get(STORAGE_KEYS.USERS, []);
+    
+    // Check if email already exists
+    const existingUser = users.find(u => u.email === signupForm.email);
+    if (existingUser) {
+      setToastMessage('Email already registered. Please use a different email or login.');
+      setToastType('error');
+      setShowToast(true);
+      setTimeout(() => {
+        setShowToast(false);
+      }, 3000);
+      return;
+    }
+    
+    // Create new user object
+    const newUser = {
+      id: Date.now().toString(), // Simple ID generation
+      name: signupForm.name,
+      email: signupForm.email,
+      password: signupForm.password, // In production, this should be hashed
+      role: role,
+      createdAt: new Date().toISOString()
+    };
+    
+    // Add new user to the users array
+    users.push(newUser);
+    
+    // Save updated users array to localStorage
+    storageService.set(STORAGE_KEYS.USERS, users);
+    
+    // Show success toast
+    setToastMessage('Account created successfully! Please login to continue.');
+    setToastType('success');
     setShowToast(true);
+    
+    // Clear form
+    setSignupForm({
+      name: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+    });
+    
+    // Navigate to login page after a short delay
     setTimeout(() => {
       setShowToast(false);
-    }, 3000);
+      setActiveTab('login');
+      // Pre-fill email in login form
+      setLoginForm({
+        email: newUser.email,
+        password: ''
+      });
+    }, 2000);
   };
 
   const handleLoginChange = (e) => {
@@ -93,8 +181,12 @@ function AuthPage() {
 
       {/* Toast Notification */}
       {showToast && (
-        <div className="fixed top-4 right-4 bg-fundverseSuccess text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-slide-in">
-          Account created successfully
+        <div className={`fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 animate-slide-in ${
+          toastType === 'success' 
+            ? 'bg-fundverseSuccess text-white' 
+            : 'bg-red-500 text-white'
+        }`}>
+          {toastMessage}
         </div>
       )}
 
@@ -217,17 +309,6 @@ function AuthPage() {
                 Welcome back! Please sign in to your account.
               </p>
 
-              {/* Dummy Credentials Info */}
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-xs font-semibold text-blue-800 mb-1">Test Credentials:</p>
-                <p className="text-xs text-blue-700">
-                  <strong>Email:</strong> {DUMMY_CREDENTIALS[role].email}
-                </p>
-                <p className="text-xs text-blue-700">
-                  <strong>Password:</strong> {DUMMY_CREDENTIALS[role].password}
-                </p>
-              </div>
-
               <form onSubmit={handleLoginSubmit} className="space-y-4">
                 <div>
                   <label htmlFor="login-email" className="block text-sm font-medium text-fundverseGrayDark mb-1">
@@ -241,7 +322,7 @@ function AuthPage() {
                     onChange={handleLoginChange}
                     required
                     className="w-full px-4 py-2 border border-fundverseGrayLight rounded-lg focus:outline-none focus:ring-2 focus:ring-fundverseOrange focus:border-transparent"
-                    placeholder={DUMMY_CREDENTIALS[role].email}
+                    placeholder="Enter your email"
                   />
                 </div>
 
@@ -257,7 +338,7 @@ function AuthPage() {
                     onChange={handleLoginChange}
                     required
                     className="w-full px-4 py-2 border border-fundverseGrayLight rounded-lg focus:outline-none focus:ring-2 focus:ring-fundverseOrange focus:border-transparent"
-                    placeholder={DUMMY_CREDENTIALS[role].password}
+                    placeholder="Enter your password"
                   />
                 </div>
 

@@ -1,8 +1,40 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import logo from '../assets/my-logo.png.png';
+import { STORAGE_KEYS } from '../services/storage/storageKeys';
 
 function Navbar() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    // Check if user is logged in
+    const userStr = sessionStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        setCurrentUser(user);
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+      }
+    }
+  }, [location.pathname]); // Re-check when route changes
+
+  const handleLogout = () => {
+    sessionStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    setCurrentUser(null);
+    navigate('/');
+  };
+
+  const getDashboardPath = () => {
+    if (currentUser?.role === 'student') {
+      return '/student/dashboard';
+    } else if (currentUser?.role === 'company') {
+      return '/company/dashboard';
+    }
+    return '/login';
+  };
 
   return (
     <nav className="bg-[#FFFFFF] border-b border-[#E5E7EB] sticky top-0 z-50">
@@ -68,14 +100,31 @@ function Navbar() {
             </div>
           </div>
 
-          {/* Login Button */}
-          <div>
-            <Link
-              to="/login"
-              className="px-6 py-2 border-2 border-[#2563EB] text-[#2563EB] rounded-lg font-medium hover:bg-[#2563EB] hover:text-white transition-colors"
-            >
-              Login
-            </Link>
+          {/* User Menu / Login Button */}
+          <div className="flex items-center gap-4">
+            {currentUser ? (
+              <>
+                <Link
+                  to={getDashboardPath()}
+                  className="hidden md:block text-[#111827] hover:text-[#3B82F6] transition-colors font-medium"
+                >
+                  {currentUser.name}
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="px-4 py-2 text-sm border-2 border-red-500 text-red-500 rounded-lg font-medium hover:bg-red-500 hover:text-white transition-colors"
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <Link
+                to="/login"
+                className="px-6 py-2 border-2 border-[#2563EB] text-[#2563EB] rounded-lg font-medium hover:bg-[#2563EB] hover:text-white transition-colors"
+              >
+                Login
+              </Link>
+            )}
           </div>
         </div>
       </div>

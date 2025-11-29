@@ -163,7 +163,15 @@ class CampaignsService {
     // localStorage mode
     const campaigns = storageService.get(STORAGE_KEYS.CAMPAIGNS, []);
     return campaigns
-      .filter(c => c.creator?.email === userId || c.creator?.id === userId)
+      .filter(c => {
+        const campaign = Campaign.fromJSON(c);
+        return campaign.creator?.email === userId || 
+               campaign.creator?.id === userId ||
+               campaign.email === userId ||
+               c.creator?.email === userId ||
+               c.creator?.id === userId ||
+               c.email === userId;
+      })
       .map(c => Campaign.fromJSON(c));
   }
 

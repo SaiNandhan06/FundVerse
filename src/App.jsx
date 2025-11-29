@@ -30,7 +30,7 @@ function AppContent() {
           <Route path="/discover" element={<Discover />} />
           <Route path="/campaign/:id" element={<CampaignDetails />} />
           <Route path="/student/dashboard" element={<StudentDashboard />} />
-          <Route path="/student/projects" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-4xl font-bold">My Projects (Coming Soon)</h1></div>} />
+          <Route path="/student/projects" element={<StudentDashboard />} />
           <Route path="/company/dashboard" element={<CompanyDashboard />} />
           <Route path="/support" element={<SupportAmount />} />
           <Route path="/support/payment" element={<PaymentPage />} />
