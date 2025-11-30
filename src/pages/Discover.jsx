@@ -3,15 +3,13 @@ import ProjectGrid from '../components/ProjectGrid';
 
 function Discover() {
   return (
-    <div className="min-h-screen bg-[#F9FAFB]">
-      <div className="py-10 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          {/* Header Section */}
-          <div className="mb-8">
-            <h1 className="text-4xl md:text-5xl font-bold text-[#111827] mb-4">
-              Explore Campaigns
-            </h1>
-            <p className="text-lg text-[#374151] max-w-3xl">
+    <div className="min-h-screen bg-gray-50">
+      <div className="section">
+        <div className="container-main">
+          {/* Header */}
+          <div className="page-header">
+            <h1 className="page-title">Explore Campaigns</h1>
+            <p className="page-description">
               Discover amazing projects from creators across India and help bring innovative ideas to life.
             </p>
           </div>
@@ -28,4 +26,3 @@ function Discover() {
 }
 
 export default Discover;
-

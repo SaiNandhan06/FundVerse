@@ -5,9 +5,32 @@ import { STORAGE_KEYS } from '../services/storage/storageKeys';
 
 function CreateCampaignForm() {
   const navigate = useNavigate();
+  const [authError, setAuthError] = useState(null);
 
-  // Scroll to top on page load
+  // Check authentication on page load
   useEffect(() => {
+    // Check if user is logged in as student
+    const userStr = sessionStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+    if (!userStr) {
+      // Not logged in
+      setAuthError('login');
+      return;
+    }
+
+    try {
+      const user = JSON.parse(userStr);
+      if (user.role !== 'student') {
+        // Not a student
+        setAuthError('student');
+        return;
+      }
+    } catch (error) {
+      console.error('Error parsing user:', error);
+      setAuthError('login');
+      return;
+    }
+
+    // Scroll to top
     window.scrollTo(0, 0);
   }, []);
 
@@ -17,23 +40,22 @@ function CreateCampaignForm() {
     campaignTitle: '',
     campaignTagline: '',
     category: '',
-    creatorType: 'Student',
-    
+
     // Campaign Description
     description: '',
     pitchDeck: null,
-    
+
     // Funding Details
     targetAmount: '',
     minimumContribution: '',
     deadline: '',
     hasMilestones: false,
     milestones: [{ title: '', amount: '', description: '' }],
-    
+
     // Visuals
     coverImage: null,
     additionalImages: [],
-    
+
     // Contact & Verification
     creatorName: '',
     email: '',
@@ -50,7 +72,7 @@ function CreateCampaignForm() {
   // Handle input changes
   const handleInputChange = (e) => {
     const { name, value, type, checked, files } = e.target;
-    
+
     if (type === 'file') {
       if (name === 'coverImage') {
         setFormData({ ...formData, coverImage: files[0] || null });
@@ -66,7 +88,7 @@ function CreateCampaignForm() {
     } else {
       setFormData({ ...formData, [name]: value });
     }
-    
+
     // Clear error for this field
     if (errors[name]) {
       setErrors({ ...errors, [name]: '' });
@@ -176,7 +198,7 @@ function CreateCampaignForm() {
           deadline: formData.deadline,
           raised: 0,
           backers: 0,
-          status: 'Active',
+          status: 'pending', // Changed from 'Active' - requires admin approval
           creatorName: formData.creatorName,
           email: formData.email,
           organization: formData.organization || '',
@@ -198,10 +220,10 @@ function CreateCampaignForm() {
 
         // Save campaign using service
         await campaignsService.create(campaignData);
-        
+
         setShowSuccess(true);
         setTimeout(() => {
-          navigate('/discover');
+          navigate('/student/dashboard'); // Changed from /discover - campaign needs approval
         }, 2000);
       } catch (error) {
         console.error('Error creating campaign:', error);
@@ -216,6 +238,50 @@ function CreateCampaignForm() {
   const formatCurrency = (amount) => {
     return `₹${parseFloat(amount || 0).toLocaleString('en-IN')}`;
   };
+
+  // If there's an auth error, show message instead of form
+  if (authError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8 text-center">
+          {/* Icon */}
+          <div className="w-20 h-20 bg-gradient-to-br from-orange-400 to-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+
+          {/* Title */}
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">
+            {authError === 'login' ? 'Login Required' : 'Student Access Only'}
+          </h1>
+
+          {/* Message */}
+          <p className="text-gray-600 mb-8 text-lg">
+            {authError === 'login'
+              ? 'Please login as a student to create a campaign and bring your ideas to life.'
+              : 'Only students can create campaigns. Please login with a student account to continue.'}
+          </p>
+
+          {/* Buttons */}
+          <div className="space-y-3">
+            <button
+              onClick={() => navigate('/login')}
+              className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:opacity-90 transition-opacity shadow-lg"
+            >
+              {authError === 'login' ? 'Login as Student' : 'Switch to Student Account'}
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              className="w-full px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+            >
+              Back to Home
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <main className="bg-[#F9FAFB] min-h-screen py-12 px-4">
@@ -233,7 +299,7 @@ function CreateCampaignForm() {
           {/* 1. Basic Details */}
           <div className="bg-white rounded-xl shadow-md p-8">
             <h2 className="text-2xl font-semibold text-[#111827] mb-6">Basic Details</h2>
-            
+
             <div className="space-y-6">
               {/* Campaign Title */}
               <div>
@@ -246,11 +312,10 @@ function CreateCampaignForm() {
                   name="campaignTitle"
                   value={formData.campaignTitle}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${
-                    errors.campaignTitle
-                      ? 'border-[#DC2626] focus:ring-[#DC2626]'
-                      : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
-                  } text-[#111827]`}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${errors.campaignTitle
+                    ? 'border-[#DC2626] focus:ring-[#DC2626]'
+                    : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
+                    } text-[#111827]`}
                   placeholder="e.g., AI-Powered Soil Health Scanner"
                 />
                 {errors.campaignTitle && (
@@ -269,11 +334,10 @@ function CreateCampaignForm() {
                   name="campaignTagline"
                   value={formData.campaignTagline}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${
-                    errors.campaignTagline
-                      ? 'border-[#DC2626] focus:ring-[#DC2626]'
-                      : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
-                  } text-[#111827]`}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${errors.campaignTagline
+                    ? 'border-[#DC2626] focus:ring-[#DC2626]'
+                    : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
+                    } text-[#111827]`}
                   placeholder="A short, compelling tagline for your campaign"
                 />
                 {errors.campaignTagline && (
@@ -281,66 +345,33 @@ function CreateCampaignForm() {
                 )}
               </div>
 
-              {/* Category and Creator Type */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label htmlFor="category" className="block text-sm font-medium text-[#111827] mb-2">
-                    Category <span className="text-[#DC2626]">*</span>
-                  </label>
-                  <select
-                    id="category"
-                    name="category"
-                    value={formData.category}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${
-                      errors.category
-                        ? 'border-[#DC2626] focus:ring-[#DC2626]'
-                        : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
+              {/* Category */}
+              <div>
+                <label htmlFor="category" className="block text-sm font-medium text-[#111827] mb-2">
+                  Category <span className="text-[#DC2626]">*</span>
+                </label>
+                <select
+                  id="category"
+                  name="category"
+                  value={formData.category}
+                  onChange={handleInputChange}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${errors.category
+                    ? 'border-[#DC2626] focus:ring-[#DC2626]'
+                    : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
                     } text-[#111827]`}
-                  >
-                    <option value="">Select a category</option>
-                    <option value="Technology">Technology</option>
-                    <option value="Health">Health</option>
-                    <option value="Education">Education</option>
-                    <option value="Environment">Environment</option>
-                    <option value="Social Impact">Social Impact</option>
-                    <option value="Art & Design">Art & Design</option>
-                    <option value="Others">Others</option>
-                  </select>
-                  {errors.category && (
-                    <p className="mt-1 text-sm text-[#DC2626]">{errors.category}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-[#111827] mb-2">
-                    Creator Type <span className="text-[#DC2626]">*</span>
-                  </label>
-                  <div className="flex gap-4">
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        name="creatorType"
-                        value="Student"
-                        checked={formData.creatorType === 'Student'}
-                        onChange={handleInputChange}
-                        className="w-4 h-4 text-[#3B82F6] border-[#E5E7EB] focus:ring-[#3B82F6]"
-                      />
-                      <span className="ml-2 text-[#111827]">Student</span>
-                    </label>
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        name="creatorType"
-                        value="Company"
-                        checked={formData.creatorType === 'Company'}
-                        onChange={handleInputChange}
-                        className="w-4 h-4 text-[#3B82F6] border-[#E5E7EB] focus:ring-[#3B82F6]"
-                      />
-                      <span className="ml-2 text-[#111827]">Company</span>
-                    </label>
-                  </div>
-                </div>
+                >
+                  <option value="">Select a category</option>
+                  <option value="Technology">Technology</option>
+                  <option value="Health">Health</option>
+                  <option value="Education">Education</option>
+                  <option value="Environment">Environment</option>
+                  <option value="Social Impact">Social Impact</option>
+                  <option value="Art & Design">Art & Design</option>
+                  <option value="Others">Others</option>
+                </select>
+                {errors.category && (
+                  <p className="mt-1 text-sm text-[#DC2626]">{errors.category}</p>
+                )}
               </div>
             </div>
           </div>
@@ -348,7 +379,7 @@ function CreateCampaignForm() {
           {/* 2. Campaign Description */}
           <div className="bg-white rounded-xl shadow-md p-8">
             <h2 className="text-2xl font-semibold text-[#111827] mb-6">Campaign Description</h2>
-            
+
             <div className="space-y-6">
               <div>
                 <label htmlFor="description" className="block text-sm font-medium text-[#111827] mb-2">
@@ -360,11 +391,10 @@ function CreateCampaignForm() {
                   value={formData.description}
                   onChange={handleInputChange}
                   rows={8}
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${
-                    errors.description
-                      ? 'border-[#DC2626] focus:ring-[#DC2626]'
-                      : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
-                  } text-[#111827]`}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${errors.description
+                    ? 'border-[#DC2626] focus:ring-[#DC2626]'
+                    : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
+                    } text-[#111827]`}
                   placeholder="Describe your idea in detail. What problem does it solve? How will it help people? What makes it unique?"
                 />
                 {errors.description && (
@@ -395,7 +425,7 @@ function CreateCampaignForm() {
           {/* 3. Funding Details */}
           <div className="bg-white rounded-xl shadow-md p-8">
             <h2 className="text-2xl font-semibold text-[#111827] mb-6">Funding Details</h2>
-            
+
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -409,11 +439,10 @@ function CreateCampaignForm() {
                     value={formData.targetAmount}
                     onChange={handleInputChange}
                     min="1"
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${
-                      errors.targetAmount
-                        ? 'border-[#DC2626] focus:ring-[#DC2626]'
-                        : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
-                    } text-[#111827]`}
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${errors.targetAmount
+                      ? 'border-[#DC2626] focus:ring-[#DC2626]'
+                      : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
+                      } text-[#111827]`}
                     placeholder="50000"
                   />
                   {errors.targetAmount && (
@@ -432,11 +461,10 @@ function CreateCampaignForm() {
                     value={formData.minimumContribution}
                     onChange={handleInputChange}
                     min="1"
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${
-                      errors.minimumContribution
-                        ? 'border-[#DC2626] focus:ring-[#DC2626]'
-                        : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
-                    } text-[#111827]`}
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${errors.minimumContribution
+                      ? 'border-[#DC2626] focus:ring-[#DC2626]'
+                      : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
+                      } text-[#111827]`}
                     placeholder="500"
                   />
                   {errors.minimumContribution && (
@@ -456,11 +484,10 @@ function CreateCampaignForm() {
                   value={formData.deadline}
                   onChange={handleInputChange}
                   min={new Date().toISOString().split('T')[0]}
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${
-                    errors.deadline
-                      ? 'border-[#DC2626] focus:ring-[#DC2626]'
-                      : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
-                  } text-[#111827]`}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${errors.deadline
+                    ? 'border-[#DC2626] focus:ring-[#DC2626]'
+                    : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
+                    } text-[#111827]`}
                 />
                 {errors.deadline && (
                   <p className="mt-1 text-sm text-[#DC2626]">{errors.deadline}</p>
@@ -536,7 +563,7 @@ function CreateCampaignForm() {
           {/* 4. Visuals */}
           <div className="bg-white rounded-xl shadow-md p-8">
             <h2 className="text-2xl font-semibold text-[#111827] mb-6">Visuals</h2>
-            
+
             <div className="space-y-6">
               <div>
                 <label htmlFor="coverImage" className="block text-sm font-medium text-[#111827] mb-2">
@@ -548,11 +575,10 @@ function CreateCampaignForm() {
                   name="coverImage"
                   onChange={handleInputChange}
                   accept=".jpg,.jpeg,.png"
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${
-                    errors.coverImage
-                      ? 'border-[#DC2626] focus:ring-[#DC2626]'
-                      : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
-                  } text-[#111827]`}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${errors.coverImage
+                    ? 'border-[#DC2626] focus:ring-[#DC2626]'
+                    : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
+                    } text-[#111827]`}
                 />
                 {errors.coverImage && (
                   <p className="mt-1 text-sm text-[#DC2626]">{errors.coverImage}</p>
@@ -604,7 +630,7 @@ function CreateCampaignForm() {
           {/* 5. Contact & Verification */}
           <div className="bg-white rounded-xl shadow-md p-8">
             <h2 className="text-2xl font-semibold text-[#111827] mb-6">Contact & Verification</h2>
-            
+
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -617,11 +643,10 @@ function CreateCampaignForm() {
                     name="creatorName"
                     value={formData.creatorName}
                     onChange={handleInputChange}
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${
-                      errors.creatorName
-                        ? 'border-[#DC2626] focus:ring-[#DC2626]'
-                        : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
-                    } text-[#111827]`}
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${errors.creatorName
+                      ? 'border-[#DC2626] focus:ring-[#DC2626]'
+                      : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
+                      } text-[#111827]`}
                     placeholder="Your full name"
                   />
                   {errors.creatorName && (
@@ -639,11 +664,10 @@ function CreateCampaignForm() {
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${
-                      errors.email
-                        ? 'border-[#DC2626] focus:ring-[#DC2626]'
-                        : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
-                    } text-[#111827]`}
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${errors.email
+                      ? 'border-[#DC2626] focus:ring-[#DC2626]'
+                      : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
+                      } text-[#111827]`}
                     placeholder="your.email@example.com"
                   />
                   {errors.email && (
@@ -663,11 +687,10 @@ function CreateCampaignForm() {
                     name="organization"
                     value={formData.organization}
                     onChange={handleInputChange}
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${
-                      errors.organization
-                        ? 'border-[#DC2626] focus:ring-[#DC2626]'
-                        : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
-                    } text-[#111827]`}
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${errors.organization
+                      ? 'border-[#DC2626] focus:ring-[#DC2626]'
+                      : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
+                      } text-[#111827]`}
                     placeholder="e.g., IIT Bombay, NIT Trichy"
                   />
                   {errors.organization && (
@@ -687,11 +710,10 @@ function CreateCampaignForm() {
                     name="city"
                     value={formData.city}
                     onChange={handleInputChange}
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${
-                      errors.city
-                        ? 'border-[#DC2626] focus:ring-[#DC2626]'
-                        : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
-                    } text-[#111827]`}
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${errors.city
+                      ? 'border-[#DC2626] focus:ring-[#DC2626]'
+                      : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
+                      } text-[#111827]`}
                     placeholder="e.g., Bangalore"
                   />
                   {errors.city && (
@@ -709,11 +731,10 @@ function CreateCampaignForm() {
                     name="state"
                     value={formData.state}
                     onChange={handleInputChange}
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${
-                      errors.state
-                        ? 'border-[#DC2626] focus:ring-[#DC2626]'
-                        : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
-                    } text-[#111827]`}
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${errors.state
+                      ? 'border-[#DC2626] focus:ring-[#DC2626]'
+                      : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
+                      } text-[#111827]`}
                     placeholder="e.g., Karnataka"
                   />
                   {errors.state && (
@@ -732,11 +753,10 @@ function CreateCampaignForm() {
                   name="idProof"
                   onChange={handleInputChange}
                   accept=".jpg,.jpeg,.png,.pdf"
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${
-                    errors.idProof
-                      ? 'border-[#DC2626] focus:ring-[#DC2626]'
-                      : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
-                  } text-[#111827]`}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${errors.idProof
+                    ? 'border-[#DC2626] focus:ring-[#DC2626]'
+                    : 'border-[#E5E7EB] focus:border-[#3B82F6] focus:ring-[#3B82F6]'
+                    } text-[#111827]`}
                 />
                 {errors.idProof && (
                   <p className="mt-1 text-sm text-[#DC2626]">{errors.idProof}</p>
@@ -779,7 +799,7 @@ function CreateCampaignForm() {
                   ×
                 </button>
               </div>
-              
+
               <div className="space-y-6">
                 {formData.coverImage && (
                   <img
@@ -795,17 +815,14 @@ function CreateCampaignForm() {
                     <span className="px-3 py-1 bg-[#EEF2FF] text-[#4F46E5] rounded-full text-sm font-medium">
                       {formData.category}
                     </span>
-                    <span className="px-3 py-1 bg-[#EEF2FF] text-[#4F46E5] rounded-full text-sm font-medium">
-                      {formData.creatorType}
-                    </span>
                   </div>
                 </div>
-                
+
                 <div className="border-t border-[#E5E7EB] pt-6">
                   <h4 className="font-semibold text-[#111827] mb-2">Description</h4>
                   <p className="text-[#6B7280] whitespace-pre-wrap">{formData.description}</p>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4 border-t border-[#E5E7EB] pt-6">
                   <div>
                     <p className="text-sm text-[#6B7280]">Target Amount</p>
@@ -826,7 +843,7 @@ function CreateCampaignForm() {
                     <p className="text-lg font-semibold text-[#111827]">{formData.creatorName}</p>
                   </div>
                 </div>
-                
+
                 {formData.hasMilestones && formData.milestones.length > 0 && (
                   <div className="border-t border-[#E5E7EB] pt-6">
                     <h4 className="font-semibold text-[#111827] mb-4">Milestones</h4>
@@ -842,7 +859,7 @@ function CreateCampaignForm() {
                   </div>
                 )}
               </div>
-              
+
               <div className="flex gap-4 mt-6 border-t border-[#E5E7EB] pt-6">
                 <button
                   onClick={() => setShowPreview(false)}

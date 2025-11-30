@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { storageService } from '../services/storage/localStorage.service';
 import { STORAGE_KEYS } from '../services/storage/storageKeys';
@@ -10,6 +10,25 @@ function AuthPage() {
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState('success'); // 'success' or 'error'
   const navigate = useNavigate();
+
+  // Create default admin user on component mount
+  useEffect(() => {
+    const users = storageService.get(STORAGE_KEYS.USERS, []);
+    const adminExists = users.find(u => u.email === 'admin@fundverse.com');
+
+    if (!adminExists) {
+      const adminUser = {
+        id: 'admin-001',
+        name: 'Admin',
+        email: 'admin@fundverse.com',
+        password: 'admin123',
+        role: 'admin',
+        createdAt: new Date().toISOString()
+      };
+      users.push(adminUser);
+      storageService.set(STORAGE_KEYS.USERS, users);
+    }
+  }, []);
 
   // Form states
   const [loginForm, setLoginForm] = useState({
@@ -26,17 +45,17 @@ function AuthPage() {
 
   const handleLoginSubmit = (e) => {
     e.preventDefault();
-    
+
     // Get all registered users from localStorage
     const users = storageService.get(STORAGE_KEYS.USERS, []);
-    
+
     // Find user with matching email, password, and role
     const user = users.find(
-      u => u.email === loginForm.email && 
-           u.password === loginForm.password && 
-           u.role === role
+      u => u.email === loginForm.email &&
+        u.password === loginForm.password &&
+        u.role === role
     );
-    
+
     if (user) {
       // Store current user in sessionStorage for session management
       sessionStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify({
@@ -45,10 +64,10 @@ function AuthPage() {
         email: user.email,
         role: user.role
       }));
-      
+
       // Store user role
       storageService.set(STORAGE_KEYS.USER_ROLE, user.role);
-      
+
       // Successful login - navigate to appropriate dashboard
       if (role === 'student') {
         navigate('/student/dashboard');
@@ -68,7 +87,7 @@ function AuthPage() {
 
   const handleSignupSubmit = (e) => {
     e.preventDefault();
-    
+
     // Validate password match
     if (signupForm.password !== signupForm.confirmPassword) {
       setToastMessage('Passwords do not match. Please try again.');
@@ -79,7 +98,7 @@ function AuthPage() {
       }, 3000);
       return;
     }
-    
+
     // Validate password length
     if (signupForm.password.length < 6) {
       setToastMessage('Password must be at least 6 characters long.');
@@ -90,10 +109,10 @@ function AuthPage() {
       }, 3000);
       return;
     }
-    
+
     // Get all registered users from localStorage
     const users = storageService.get(STORAGE_KEYS.USERS, []);
-    
+
     // Check if email already exists
     const existingUser = users.find(u => u.email === signupForm.email);
     if (existingUser) {
@@ -105,7 +124,7 @@ function AuthPage() {
       }, 3000);
       return;
     }
-    
+
     // Create new user object
     const newUser = {
       id: Date.now().toString(), // Simple ID generation
@@ -115,18 +134,18 @@ function AuthPage() {
       role: role,
       createdAt: new Date().toISOString()
     };
-    
+
     // Add new user to the users array
     users.push(newUser);
-    
+
     // Save updated users array to localStorage
     storageService.set(STORAGE_KEYS.USERS, users);
-    
+
     // Show success toast
     setToastMessage('Account created successfully! Please login to continue.');
     setToastType('success');
     setShowToast(true);
-    
+
     // Clear form
     setSignupForm({
       name: '',
@@ -134,7 +153,7 @@ function AuthPage() {
       password: '',
       confirmPassword: '',
     });
-    
+
     // Navigate to login page after a short delay
     setTimeout(() => {
       setShowToast(false);
@@ -181,11 +200,10 @@ function AuthPage() {
 
       {/* Toast Notification */}
       {showToast && (
-        <div className={`fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 animate-slide-in ${
-          toastType === 'success' 
-            ? 'bg-fundverseSuccess text-white' 
-            : 'bg-red-500 text-white'
-        }`}>
+        <div className={`fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 animate-slide-in ${toastType === 'success'
+          ? 'bg-fundverseSuccess text-white'
+          : 'bg-red-500 text-white'
+          }`}>
           {toastMessage}
         </div>
       )}
@@ -213,21 +231,19 @@ function AuthPage() {
           <div className="flex gap-4">
             <button
               onClick={() => setRole('student')}
-              className={`flex-1 px-6 py-3 rounded-lg font-medium transition-all ${
-                role === 'student'
-                  ? 'bg-white text-iconBlue shadow-lg'
-                  : 'bg-fundverseIndigo text-white hover:bg-fundverseBlue'
-              }`}
+              className={`flex-1 px-6 py-3 rounded-lg font-medium transition-all ${role === 'student'
+                ? 'bg-white text-iconBlue shadow-lg'
+                : 'bg-fundverseIndigo text-white hover:bg-fundverseBlue'
+                }`}
             >
               Student
             </button>
             <button
               onClick={() => setRole('company')}
-              className={`flex-1 px-6 py-3 rounded-lg font-medium transition-all ${
-                role === 'company'
-                  ? 'bg-white text-iconIndigo shadow-lg'
-                  : 'bg-fundverseIndigo text-white hover:bg-fundverseBlue'
-              }`}
+              className={`flex-1 px-6 py-3 rounded-lg font-medium transition-all ${role === 'company'
+                ? 'bg-white text-iconIndigo shadow-lg'
+                : 'bg-fundverseIndigo text-white hover:bg-fundverseBlue'
+                }`}
             >
               Company
             </button>
@@ -250,21 +266,19 @@ function AuthPage() {
           <div className="flex mb-8 border-b border-gray-200">
             <button
               onClick={() => setActiveTab('login')}
-              className={`flex-1 py-3 px-4 text-center font-medium transition-colors ${
-                activeTab === 'login'
-                  ? 'text-fundverseOrange border-b-2 border-fundverseOrange'
-                  : 'text-mutedText hover:text-fundverseGrayDark'
-              }`}
+              className={`flex-1 py-3 px-4 text-center font-medium transition-colors ${activeTab === 'login'
+                ? 'text-fundverseOrange border-b-2 border-fundverseOrange'
+                : 'text-mutedText hover:text-fundverseGrayDark'
+                }`}
             >
               Login
             </button>
             <button
               onClick={() => setActiveTab('signup')}
-              className={`flex-1 py-3 px-4 text-center font-medium transition-colors ${
-                activeTab === 'signup'
-                  ? 'text-fundverseOrange border-b-2 border-fundverseOrange'
-                  : 'text-mutedText hover:text-fundverseGrayDark'
-              }`}
+              className={`flex-1 py-3 px-4 text-center font-medium transition-colors ${activeTab === 'signup'
+                ? 'text-fundverseOrange border-b-2 border-fundverseOrange'
+                : 'text-mutedText hover:text-fundverseGrayDark'
+                }`}
             >
               Sign Up
             </button>
@@ -278,21 +292,19 @@ function AuthPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => setRole('student')}
-                  className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all text-sm ${
-                  role === 'student'
-                    ? 'bg-fundverseOrange text-white shadow-md'
-                    : 'bg-fundverseBgLight text-fundverseGrayDark hover:bg-fundverseGrayLight'
-                }`}
+                className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all text-sm ${role === 'student'
+                  ? 'bg-fundverseOrange text-white shadow-md'
+                  : 'bg-fundverseBgLight text-fundverseGrayDark hover:bg-fundverseGrayLight'
+                  }`}
               >
                 Student
               </button>
               <button
                 onClick={() => setRole('company')}
-                  className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all text-sm ${
-                  role === 'company'
-                    ? 'bg-fundverseOrange text-white shadow-md'
-                    : 'bg-fundverseBgLight text-fundverseGrayDark hover:bg-fundverseGrayLight'
-                }`}
+                className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all text-sm ${role === 'company'
+                  ? 'bg-fundverseOrange text-white shadow-md'
+                  : 'bg-fundverseBgLight text-fundverseGrayDark hover:bg-fundverseGrayLight'
+                  }`}
               >
                 Company
               </button>
@@ -359,54 +371,6 @@ function AuthPage() {
                   Sign In
                 </button>
               </form>
-
-              {/* Social Login Buttons */}
-              <div className="mt-6">
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-fundverseGrayLight"></div>
-                  </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-white text-mutedText">Or continue with</span>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => handleSocialLogin('Google')}
-                    className="flex items-center justify-center px-4 py-2 border border-fundverseGrayLight rounded-lg hover:bg-fundverseBgLight transition-all duration-200 hover:border-fundverseOrange"
-                  >
-                    <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                      <path
-                        fill="#4285F4"
-                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                      />
-                      <path
-                        fill="#34A853"
-                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                      />
-                      <path
-                        fill="#FBBC05"
-                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                      />
-                      <path
-                        fill="#EA4335"
-                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                      />
-                    </svg>
-                    Google
-                  </button>
-                  <button
-                    onClick={() => handleSocialLogin('LinkedIn')}
-                    className="flex items-center justify-center px-4 py-2 border border-fundverseGrayLight rounded-lg hover:bg-fundverseBgLight transition-all duration-200 hover:border-fundverseOrange"
-                  >
-                    <svg className="w-5 h-5 mr-2" fill="#0077B5" viewBox="0 0 24 24">
-                      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-                    </svg>
-                    LinkedIn
-                  </button>
-                </div>
-              </div>
             </div>
           )}
 
@@ -506,61 +470,48 @@ function AuthPage() {
                   Create Account
                 </button>
               </form>
-
-              {/* Social Login Buttons */}
-              <div className="mt-6">
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-fundverseGrayLight"></div>
-                  </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-white text-mutedText">Or continue with</span>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => handleSocialLogin('Google')}
-                    className="flex items-center justify-center px-4 py-2 border border-fundverseGrayLight rounded-lg hover:bg-fundverseBgLight transition-all duration-200 hover:border-fundverseOrange"
-                  >
-                    <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                      <path
-                        fill="#4285F4"
-                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                      />
-                      <path
-                        fill="#34A853"
-                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                      />
-                      <path
-                        fill="#FBBC05"
-                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                      />
-                      <path
-                        fill="#EA4335"
-                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                      />
-                    </svg>
-                    Google
-                  </button>
-                  <button
-                    onClick={() => handleSocialLogin('LinkedIn')}
-                    className="flex items-center justify-center px-4 py-2 border border-fundverseGrayLight rounded-lg hover:bg-fundverseBgLight transition-all duration-200 hover:border-fundverseOrange"
-                  >
-                    <svg className="w-5 h-5 mr-2" fill="#0077B5" viewBox="0 0 24 24">
-                      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-                    </svg>
-                    LinkedIn
-                  </button>
-                </div>
-              </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* Admin Button - Circular, Bottom Right */}
+      <button
+        onClick={() => {
+          // Check if user is already logged in as admin
+          const userStr = sessionStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+          if (userStr) {
+            try {
+              const user = JSON.parse(userStr);
+              if (user.role === 'admin') {
+                // Already logged in as admin, go directly to dashboard
+                navigate('/admin/dashboard');
+                return;
+              }
+            } catch (error) {
+              console.error('Error parsing user:', error);
+            }
+          }
+          // Not logged in as admin, go to login page
+          navigate('/admin/login');
+        }}
+        className="fixed bottom-6 right-6 z-50 w-16 h-16 bg-gradient-to-br from-purple-600 to-pink-600 text-white shadow-lg hover:shadow-2xl hover:scale-110 transition-all duration-300 flex items-center justify-center group"
+        style={{ borderRadius: '50%' }}
+        title="Admin Access"
+      >
+        {/* Admin Settings Icon */}
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+
+        {/* Tooltip */}
+        <span className="absolute bottom-full right-0 mb-2 px-3 py-1 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+          Admin Access
+        </span>
+      </button>
     </div>
   );
 }
 
 export default AuthPage;
-

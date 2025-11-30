@@ -53,14 +53,6 @@ function StudentDashboard() {
     }
   }, [location.pathname]);
 
-  // Removed handleMyProjects - projects section now stays within dashboard
-
-  const handleLogout = () => {
-    sessionStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-    storageService.remove(STORAGE_KEYS.USER_ROLE);
-    navigate('/login');
-  };
-
   // Get user's full data from localStorage
   const getUserData = () => {
     if (!currentUser) return null;
@@ -87,7 +79,7 @@ function StudentDashboard() {
       email: userData?.email || currentUser?.email || '',
       college: userData?.college || 'Not specified',
       major: userData?.major || 'Not specified',
-      ongoingProjects: realProjects.filter(p => p.status === 'Active').length,
+      ongoingProjects: realProjects.filter(p => p.status === 'Active' || p.status === 'approved').length,
       totalRaised: `₹${totalRaisedAmount.toLocaleString('en-IN')}`,
       profilePicture: 'data:image/svg+xml,%3Csvg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"%3E%3Ccircle cx="50" cy="50" r="50" fill="%232563EB"/%3E%3Ccircle cx="50" cy="35" r="12" fill="%23DBEAFE"/%3E%3Cpath d="M25 70C25 60 30 55 40 55L60 55C70 55 75 60 75 70L75 85L25 85L25 70Z" fill="%23DBEAFE"/%3E%3C/svg%3E'
     };
@@ -98,7 +90,7 @@ function StudentDashboard() {
       // Get user's email from currentUser or from localStorage users
       const userEmail = currentUser?.email;
       const userId = currentUser?.id;
-      
+
       if (!userEmail && !userId) {
         // Fallback to dummy project
         setMyProjects([
@@ -116,25 +108,29 @@ function StudentDashboard() {
         return;
       }
 
-      // Try getUserCampaigns first, then fallback to filtering all campaigns
-      let userProjects = [];
-      try {
-        userProjects = await campaignsService.getUserCampaigns(userEmail || userId);
-      } catch (error) {
-        // Fallback: Get all campaigns and filter
-        const allCampaigns = await campaignsService.getAll();
-        userProjects = allCampaigns.filter(campaign => 
-          campaign.creator?.email === userEmail || 
-          campaign.creator?.id === userId ||
-          campaign.email === userEmail
-        );
-      }
+      // Get all campaigns and filter manually to ensure we catch both email and ID matches
+      const allCampaigns = await campaignsService.getAll();
+      const userProjects = allCampaigns.filter(campaign => {
+        // Check by ID (most reliable)
+        if (userId && (campaign.creator?.id === userId || campaign.userId === userId)) {
+          return true;
+        }
+        // Check by Email
+        if (userEmail && (
+          campaign.creator?.email === userEmail ||
+          campaign.email === userEmail ||
+          campaign.creatorEmail === userEmail
+        )) {
+          return true;
+        }
+        return false;
+      });
 
       const formattedProjects = userProjects.map(campaign => {
         const raised = campaign.raised || 0;
         const target = campaign.targetAmount || 0;
         const fundedPercent = target > 0 ? Math.round((raised / target) * 100) : 0;
-        
+
         return {
           title: campaign.campaignTitle || campaign.title || 'Untitled Campaign',
           category: campaign.category || 'Others',
@@ -199,7 +195,7 @@ function StudentDashboard() {
   // Funding Analytics - calculate from actual projects
   const analytics = useMemo(() => {
     const realProjects = myProjects.filter(p => !p.id?.startsWith('dummy-'));
-    const completedProjects = realProjects.filter(p => 
+    const completedProjects = realProjects.filter(p =>
       p.status === 'Completed' || parseFloat(p.fundedPercent.replace('%', '')) >= 100
     ).length;
     const totalBackers = realProjects.reduce((sum, p) => {
@@ -208,7 +204,7 @@ function StudentDashboard() {
 
     return {
       totalCampaigns: realProjects.length,
-      successRate: realProjects.length > 0 
+      successRate: realProjects.length > 0
         ? `${Math.round((completedProjects / realProjects.length) * 100)}%`
         : '0%',
       totalBackers: totalBackers
@@ -232,13 +228,17 @@ function StudentDashboard() {
   ];
 
   const getStatusColor = (status) => {
-    switch (status) {
-      case 'Active':
+    const normalizedStatus = status?.toLowerCase();
+    switch (normalizedStatus) {
+      case 'active':
+      case 'approved':
         return 'bg-[#3B82F6] text-white';
-      case 'Pending':
+      case 'pending':
         return 'bg-[#F59E0B] text-white';
-      case 'Completed':
+      case 'completed':
         return 'bg-[#10B981] text-white';
+      case 'rejected':
+        return 'bg-[#EF4444] text-white';
       default:
         return 'bg-[#6B7280] text-white';
     }
@@ -253,9 +253,8 @@ function StudentDashboard() {
     <div className="min-h-screen bg-[#F9FAFB] flex">
       {/* Sidebar */}
       <aside
-        className={`bg-[#FFFFFF] border-r border-[#E5E7EB] fixed h-screen z-40 transition-all duration-300 ease-in-out shadow-lg ${
-          sidebarOpen ? 'w-64 translate-x-0' : 'w-20 -translate-x-0'
-        }`}
+        className={`bg-[#FFFFFF] border-r border-[#E5E7EB] fixed h-screen z-40 transition-all duration-300 ease-in-out shadow-lg ${sidebarOpen ? 'w-64 translate-x-0' : 'w-20 -translate-x-0'
+          }`}
       >
         <div className="h-full flex flex-col">
           {/* Header with Toggle */}
@@ -288,11 +287,10 @@ function StudentDashboard() {
               <button
                 key={item.id}
                 onClick={() => setActiveSection(item.id)}
-                className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-300 ease-in-out flex items-center gap-3 ${
-                  activeSection === item.id
+                className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-300 ease-in-out flex items-center gap-3 ${activeSection === item.id
                     ? 'bg-[#3B82F6] text-white'
                     : 'text-[#6B7280] hover:bg-[#EEF2FF] hover:text-[#111827]'
-                }`}
+                  }`}
                 title={!sidebarOpen ? item.label : ''}
               >
                 <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -317,12 +315,6 @@ function StudentDashboard() {
                 <p className="text-sm text-[#6B7280] mt-1">{studentProfile.email}</p>
               )}
             </div>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
-            >
-              Logout
-            </button>
           </div>
 
           {/* Overview Section */}
@@ -396,10 +388,10 @@ function StudentDashboard() {
                             </span>
                           </div>
                           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(project.status)}`}>
-                            {project.status}
+                            {project.status?.charAt(0).toUpperCase() + project.status?.slice(1)}
                           </span>
                         </div>
-                        
+
                         <div className="mb-4">
                           <div className="flex items-center justify-between text-sm mb-2">
                             <span className="text-[#6B7280]">Progress</span>
@@ -555,10 +547,10 @@ function StudentDashboard() {
                           </span>
                         </div>
                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(project.status)}`}>
-                          {project.status}
+                          {project.status?.charAt(0).toUpperCase() + project.status?.slice(1)}
                         </span>
                       </div>
-                      
+
                       <div className="mb-4">
                         <div className="flex items-center justify-between text-sm mb-2">
                           <span className="text-[#6B7280]">Progress</span>
